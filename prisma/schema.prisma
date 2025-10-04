@@ -7,6 +7,38 @@ datasource db {
   url      = env("API_POSTGRES_URL")
 }
 
+enum TaskState {
+  NEW
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum OrderService {
+  APPRAISAL
+  TITLE
+  FLOOD
+  MI
+  SSA89
+  IRS4506C @map("4506-C")
+}
+
+enum OrderStatus {
+  PENDING
+  DRAFT
+  SUBMITTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+enum DlqEntryStatus {
+  PENDING
+  REPLAYED
+  ARCHIVED
+}
+
 model Tenant {
   id         String        @id @default(uuid()) @db.Uuid
   slug       String        @unique
@@ -65,7 +97,7 @@ model User {
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   userRoles   UserRole[]
   loanParties LoanParty[]
-  tasksAssigned Task[]    @relation("TaskAssignee")
+  tasksOwned Task[]    @relation("TaskOwner")
   ownedConditions Condition[] @relation("ConditionAssignee")
   communications Communication[] @relation("CommunicationActor")
   accessAudits AccessAudit[]
@@ -577,24 +609,64 @@ model Condition {
 }
 
 model Task {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  loanId    String?  @map("loan_id") @db.Uuid
-  title     String
-  description String?
-  status    String?
-  assigneeId  String?   @map("assignee") @db.Uuid
-  dueAt     DateTime? @map("due_at")
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
-  createdBy String?   @map("created_by") @db.Uuid
-  updatedBy String?   @map("updated_by") @db.Uuid
-  version   Int       @default(1)
-  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  assignee  User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  loanId       String?    @map("loan_id") @db.Uuid
+  ownerUserId  String?    @map("owner_user_id") @db.Uuid
+  queueKey     String     @map("queue_key")
+  type         String
+  state        TaskState  @default(NEW)
+  priority     Int        @default(3)
+  dueAt        DateTime?  @map("due_at")
+  slaDueAt     DateTime?  @map("sla_due_at")
+  tags         String[]   @default([])
+  metadata     Json?      @map("metadata_jsonb")
+  createdAt    DateTime   @map("created_at") @default(now())
+  updatedAt    DateTime   @map("updated_at") @default(now()) @updatedAt
+  createdBy    String?    @map("created_by") @db.Uuid
+  updatedBy    String?    @map("updated_by") @db.Uuid
+  version      Int        @default(1)
+  loan         Loan?      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  owner        User?      @relation("TaskOwner", fields: [ownerUserId], references: [id])
+  events       TaskEvent[]
 
-  @@index([tenantId, assigneeId, dueAt])
+  @@index([tenantId, state, queueKey, dueAt])
+  @@index([tenantId, ownerUserId, state])
   @@map("tasks")
+}
+
+model TaskEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  eventType   String   @map("event_type")
+  stateFrom   TaskState? @map("state_from")
+  stateTo     TaskState? @map("state_to")
+  payload     Json?    @map("payload_jsonb")
+  prevHash    String?  @map("prev_hash")
+  hash        String
+  createdAt   DateTime @map("created_at") @default(now())
+  createdBy   String?  @map("created_by") @db.Uuid
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, taskId, createdAt])
+  @@map("task_events")
+}
+
+model QueueDef {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  key         String
+  name        String
+  skills      String[]
+  routingJson Json     @map("routing_json")
+  createdAt   DateTime @map("created_at") @default(now())
+  updatedAt   DateTime @map("updated_at") @default(now()) @updatedAt
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  version     Int      @default(1)
+
+  @@id([tenantId, key])
+  @@map("queue_defs")
 }
 
 model Communication {
@@ -689,6 +761,143 @@ model Order {
   @@index([tenantId, loanId, createdAt])
   @@index([tenantId, service])
   @@map("orders")
+}
+
+model Vendor {
+  id         String         @id @default(uuid()) @db.Uuid
+  tenantId   String?        @map("tenant_id") @db.Uuid
+  slug       String
+  name       String
+  services   OrderService[]
+  healthJson Json?          @map("health_json")
+  isActive   Boolean        @map("is_active") @default(true)
+  createdAt  DateTime       @map("created_at") @default(now())
+  updatedAt  DateTime       @map("updated_at") @default(now()) @updatedAt
+  createdBy  String?        @map("created_by") @db.Uuid
+  updatedBy  String?        @map("updated_by") @db.Uuid
+  version    Int            @default(1)
+  accounts   VendorAccount[]
+  orders     Order[]
+  requests   VendorRequest[]
+  responses  VendorResponse[]
+  webhooks   Webhook[]
+
+  @@unique([tenantId, slug])
+  @@map("vendors")
+}
+
+model VendorAccount {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  vendorId      String    @map("vendor_id") @db.Uuid
+  displayName   String    @map("display_name")
+  skills        String[]  @default([])
+  credentials   Json?     @map("credentials_jsonb")
+  status        String    @default("active")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  createdAt     DateTime  @map("created_at") @default(now())
+  updatedAt     DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedBy     String?   @map("updated_by") @db.Uuid
+  version       Int       @default(1)
+  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  requests      VendorRequest[]
+
+  @@unique([tenantId, vendorId, displayName])
+  @@map("vendor_accounts")
+}
+
+model VendorRequest {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  orderId        String?       @map("order_id") @db.Uuid
+  vendorId       String        @map("vendor_id") @db.Uuid
+  vendorAccountId String?      @map("vendor_account_id") @db.Uuid
+  service        OrderService  @map("service")
+  status         OrderStatus   @default(PENDING)
+  attempt        Int           @default(1)
+  correlationId  String        @map("correlation_id")
+  keyHash        String?       @map("key_hash")
+  requestHash    String?       @map("request_hash")
+  responseHash   String?       @map("response_hash")
+  responsePayload Json?        @map("response_payload")
+  requestJson    Json?         @map("request_json")
+  responseJson   Json?         @map("response_json")
+  latencyMs      Int?          @map("latency_ms")
+  createdAt      DateTime      @map("created_at") @default(now())
+  updatedAt      DateTime      @map("updated_at") @default(now()) @updatedAt
+  createdBy      String?       @map("created_by") @db.Uuid
+  updatedBy      String?       @map("updated_by") @db.Uuid
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor         Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendorAccount  VendorAccount? @relation(fields: [vendorAccountId], references: [id])
+  responses      VendorResponse[]
+  webhooks       Webhook[]
+
+  @@unique([tenantId, correlationId])
+  @@unique([tenantId, keyHash])
+  @@index([tenantId, vendorId, service])
+  @@map("vendor_requests")
+}
+
+model VendorResponse {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  requestId     String   @map("request_id") @db.Uuid
+  vendorId      String?  @map("vendor_id") @db.Uuid
+  statusCode    Int?     @map("status_code")
+  errorCode     String?  @map("error_code")
+  payload       Json?    @map("payload_json")
+  receivedAt    DateTime @map("received_at") @default(now())
+  createdAt     DateTime @map("created_at") @default(now())
+  request       VendorRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  vendor        Vendor?  @relation(fields: [vendorId], references: [id])
+
+  @@index([tenantId, requestId])
+  @@index([tenantId, vendorId])
+  @@map("vendor_responses")
+}
+
+model Webhook {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  vendorId       String    @map("vendor_id") @db.Uuid
+  requestId      String?   @map("request_id") @db.Uuid
+  externalId     String?   @map("external_id")
+  signature      String?   @map("signature")
+  signatureValid Boolean   @map("signature_valid") @default(false)
+  payload        Json      @map("payload_json")
+  headers        Json?     @map("headers_json")
+  receivedAt     DateTime  @map("received_at") @default(now())
+  processedAt    DateTime? @map("processed_at")
+  status         String    @default("pending")
+  createdAt      DateTime  @map("created_at") @default(now())
+  vendor         Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  request        VendorRequest? @relation(fields: [requestId], references: [id])
+
+  @@index([tenantId, vendorId, receivedAt])
+  @@map("webhooks")
+}
+
+model DlqEntry {
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String?        @map("tenant_id") @db.Uuid
+  source       String
+  refId        String?        @map("ref_id")
+  reasonCode   String         @map("reason_code")
+  attempts     Int            @default(0)
+  payloadJson  Json           @map("payload_json")
+  firstSeenAt  DateTime       @map("first_seen_at") @default(now())
+  lastSeenAt   DateTime       @map("last_seen_at") @default(now())
+  status       DlqEntryStatus @default(PENDING)
+  createdAt    DateTime       @map("created_at") @default(now())
+  updatedAt    DateTime       @map("updated_at") @default(now()) @updatedAt
+  replayedAt   DateTime?      @map("replayed_at")
+
+  @@index([tenantId, status])
+  @@index([source, status])
+  @@map("dlq_entries")
 }
 
 model PricingQuote {

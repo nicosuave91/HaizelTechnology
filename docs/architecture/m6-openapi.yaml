@@ -1,0 +1,697 @@
+openapi: 3.1.0
+info:
+  title: Haizel Tasks, Queues, and Orders API
+  version: 0.6.0
+  description: |
+    Milestone M6 contract for task management, SLA heatmaps, orders, and DLQ operations.
+servers:
+  - url: https://api.haizel.dev/v1
+    description: Production
+  - url: https://api.sandbox.haizel.dev/v1
+    description: Sandbox
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TenantId:
+      in: header
+      name: X-Tenant-Id
+      schema:
+        type: string
+      required: true
+      description: Tenant context for multi-tenancy.
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+          nullable: true
+        ownerUserId:
+          type: string
+          format: uuid
+          nullable: true
+        queueKey:
+          type: string
+        type:
+          type: string
+        state:
+          type: string
+          enum: [NEW, IN_PROGRESS, BLOCKED, DONE]
+        priority:
+          type: integer
+          minimum: 1
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        slaDueAt:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - queueKey
+        - type
+        - state
+        - priority
+        - createdAt
+        - updatedAt
+    QueueDefinition:
+      type: object
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        routing:
+          type: object
+          additionalProperties: true
+        aggregates:
+          type: object
+          properties:
+            total:
+              type: integer
+            new:
+              type: integer
+            inProgress:
+              type: integer
+            blocked:
+              type: integer
+            overdue:
+              type: integer
+      required:
+        - key
+        - name
+        - skills
+        - routing
+    SlaHeatmapCell:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: ISO timestamp bucket for the cell.
+        total:
+          type: integer
+        warning:
+          type: integer
+        overdue:
+          type: integer
+        query:
+          type: string
+          description: Relative link for filtered list view.
+      required:
+        - bucket
+        - total
+    SlaHeatmap:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [tasks, orders]
+        range:
+          type: string
+          enum: [week, month]
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlaHeatmapCell'
+        atRisk:
+          type: array
+          description: List of ids at risk or overdue.
+          items:
+            type: string
+      required:
+        - scope
+        - range
+        - cells
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+          nullable: true
+        service:
+          type: string
+          enum: [APPRAISAL, TITLE, FLOOD, MI, SSA89, '4506-C']
+        status:
+          type: string
+          enum: [DRAFT, SUBMITTED, IN_PROGRESS, COMPLETED, FAILED, CANCELED]
+        vendorId:
+          type: string
+          format: uuid
+          nullable: true
+        vendorAccountId:
+          type: string
+          format: uuid
+          nullable: true
+        slaDueAt:
+          type: string
+          format: date-time
+          nullable: true
+        cost:
+          type: number
+          format: float
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - service
+        - status
+        - createdAt
+        - updatedAt
+    DlqEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+        refId:
+          type: string
+          nullable: true
+        reasonCode:
+          type: string
+        attempts:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, REPLAYED, ARCHIVED]
+        firstSeenAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - source
+        - reasonCode
+        - attempts
+        - status
+        - firstSeenAt
+        - lastSeenAt
+security:
+  - BearerAuth: []
+paths:
+  /tasks:
+    get:
+      summary: List tasks for the current tenant
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: state
+          schema:
+            type: string
+          description: Optional task state filter.
+        - in: query
+          name: queueKey
+          schema:
+            type: string
+        - in: query
+          name: ownerUserId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Paginated task response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      total:
+                        type: integer
+                required:
+                  - data
+                  - pagination
+    post:
+      summary: Bulk update tasks
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                updates:
+                  type: object
+                  properties:
+                    ownerUserId:
+                      type: string
+                      format: uuid
+                      nullable: true
+                    dueAt:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                    priority:
+                      type: integer
+              required:
+                - taskIds
+                - updates
+      responses:
+        '202':
+          description: Tasks queued for update
+  /tasks/{id}/start:
+    post:
+      summary: Start work on a task
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{id}/block:
+    post:
+      summary: Block a task with reason metadata
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties: true
+              required:
+                - reason
+      responses:
+        '200':
+          description: Blocked task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{id}/complete:
+    post:
+      summary: Complete a task
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Completed task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /queues:
+    get:
+      summary: Retrieve configured queues and aggregates
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Queue catalog with aggregates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QueueDefinition'
+                  updatedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - data
+                  - updatedAt
+  /queues/route:
+    post:
+      summary: Route a task according to queue rules
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskId:
+                  type: string
+                  format: uuid
+                preferredQueues:
+                  type: array
+                  items:
+                    type: string
+                skills:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - taskId
+      responses:
+        '200':
+          description: Routed task metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queueKey:
+                    type: string
+                  ownerUserId:
+                    type: string
+                    format: uuid
+                    nullable: true
+  /sla/heatmap:
+    get:
+      summary: SLA heatmap aggregates
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: scope
+          required: true
+          schema:
+            type: string
+            enum: [tasks, orders]
+        - in: query
+          name: range
+          schema:
+            type: string
+            enum: [week, month]
+            default: week
+      responses:
+        '200':
+          description: Heatmap payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlaHeatmap'
+  /orders:
+    get:
+      summary: List orders
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: service
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: loanId
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  total:
+                    type: integer
+                required:
+                  - data
+                  - total
+    post:
+      summary: Create order
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                loanId:
+                  type: string
+                  format: uuid
+                service:
+                  type: string
+                  enum: [APPRAISAL, TITLE, FLOOD, MI, SSA89, '4506-C']
+                vendorId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                metadata:
+                  type: object
+                  additionalProperties: true
+              required:
+                - loanId
+                - service
+      responses:
+        '201':
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+  /orders:bulk:
+    post:
+      summary: Bulk flood certificate ordering
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                loanIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                service:
+                  type: string
+                  enum: [FLOOD]
+                  default: FLOOD
+              required:
+                - loanIds
+      responses:
+        '202':
+          description: Bulk submission accepted
+  /orders/{id}:retry:
+    post:
+      summary: Retry an order with exponential backoff tracking
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Retry accepted
+  /dlq:
+    get:
+      summary: Inspect dead letter queue entries
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DLQ entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DlqEntry'
+                required:
+                  - data
+  /dlq/{id}:replay:
+    post:
+      summary: Replay a DLQ entry
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Replay accepted
+  /webhooks/{vendor}:
+    post:
+      summary: Ingest vendor webhook payloads
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - in: path
+          name: vendor
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Signature
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '202':
+          description: Webhook accepted for processing
