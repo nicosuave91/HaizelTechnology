@@ -28,6 +28,12 @@ jobs:
           PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
           PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
           PRISMA_CLIENT_ENGINE_TYPE: 'binary'
+      - name: Install API dependencies
+        env:
+          PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
+          PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
+          PRISMA_CLIENT_ENGINE_TYPE: 'binary'
+        run: pnpm --filter api install
       - name: Generate Prisma Client
         env:
           PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1'
