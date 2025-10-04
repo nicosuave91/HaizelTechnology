@@ -8,83 +8,461 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  slug      String   @unique
-  name      String
-  theme     Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
-  loans     Loan[]
-  events    Event[]
+  id         String        @id @default(uuid()) @db.Uuid
+  slug       String        @unique
+  name       String
+  theme      Json?
+  createdAt  DateTime      @map("created_at") @default(now())
+  updatedAt  DateTime      @map("updated_at") @default(now()) @updatedAt
+  createdBy  String?       @map("created_by") @db.Uuid
+  updatedBy  String?       @map("updated_by") @db.Uuid
+  version    Int           @default(1)
+  roles      Role[]
+  users      User[]
+  featureFlags FeatureFlag[]
+  apiKeys    ApiKey[]
+  loans      Loan[]
+  events     Event[]
+
+  @@map("tenants")
+}
+
+model Role {
+  id         String        @id @default(uuid()) @db.Uuid
+  tenantId   String?       @map("tenant_id") @db.Uuid
+  code       String
+  name       String
+  description String?
+  createdAt  DateTime      @map("created_at") @default(now())
+  updatedAt  DateTime      @map("updated_at") @default(now()) @updatedAt
+  createdBy  String?       @map("created_by") @db.Uuid
+  updatedBy  String?       @map("updated_by") @db.Uuid
+  version    Int           @default(1)
+  tenant     Tenant?       @relation(fields: [tenantId], references: [id])
+  rolePermissions RolePermission[]
+  userRoles  UserRole[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
 }
 
 model User {
-  id        String     @id @default(uuid())
-  tenantId  String
-  email     String
-  name      String
-  role      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  loans     Loan[]
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  email       String
+  name        String
+  passwordHash String?    @map("password_hash")
+  status      String?
+  createdAt   DateTime    @map("created_at") @default(now())
+  updatedAt   DateTime    @map("updated_at") @default(now()) @updatedAt
+  createdBy   String?     @map("created_by") @db.Uuid
+  updatedBy   String?     @map("updated_by") @db.Uuid
+  version     Int         @default(1)
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  userRoles   UserRole[]
+  loanParties LoanParty[]
+  tasksAssigned Task[]    @relation("TaskAssignee")
+  ownedConditions Condition[] @relation("ConditionAssignee")
+  communications Communication[] @relation("CommunicationActor")
 
-  @@index([tenantId])
   @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model UserRole {
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  assignedAt DateTime @map("assigned_at") @default(now())
+  assignedBy String?  @map("assigned_by") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId    String   @map("role_id") @db.Uuid
+  permission String
+  createdAt DateTime @map("created_at") @default(now())
+  createdBy String?  @map("created_by") @db.Uuid
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+  @@map("role_permissions")
+}
+
+model FeatureFlag {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  flag       String
+  enabled    Boolean  @default(false)
+  rollout    Json?
+  createdAt  DateTime @map("created_at") @default(now())
+  updatedAt  DateTime @map("updated_at") @default(now()) @updatedAt
+  createdBy  String?  @map("created_by") @db.Uuid
+  updatedBy  String?  @map("updated_by") @db.Uuid
+  version    Int      @default(1)
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, flag])
+  @@map("feature_flags")
+}
+
+model ApiKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  keyHash   String   @map("key_hash")
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @default(now()) @updatedAt
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+  version   Int      @default(1)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("api_keys")
 }
 
 model Loan {
-  id           String   @id @default(uuid())
-  tenantId     String
-  userId       String
-  loanNumber   String
-  status       String
-  amount       Decimal  @db.Decimal(14, 2)
-  borrowerName String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  user         User     @relation(fields: [userId], references: [id])
-  events       Event[]
+  id          String     @id @default(uuid()) @db.Uuid
+  tenantId    String     @map("tenant_id") @db.Uuid
+  loanNumber  String     @map("loan_number")
+  status      String
+  amount      Decimal?   @db.Decimal(14, 2)
+  loanType    String?    @map("loan_type")
+  createdAt   DateTime   @map("created_at") @default(now())
+  updatedAt   DateTime   @map("updated_at") @default(now()) @updatedAt
+  createdBy   String?    @map("created_by") @db.Uuid
+  updatedBy   String?    @map("updated_by") @db.Uuid
+  version     Int        @default(1)
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  borrowers   Borrower[]
+  coBorrowers CoBorrower[]
+  loanParties LoanParty[]
+  loanStates  LoanState[]
+  documents   Document[]
+  conditions  Condition[]
+  tasks       Task[]
+  communications Communication[]
+  clocks      Clock[]
+  disclosures Disclosure[]
+  orders      Order[]
+  pricingQuotes PricingQuote[]
+  rateLocks   RateLock[]
+  findings    Finding[]
+  events      Event[]
 
-  @@index([tenantId])
-  @@index([userId])
   @@unique([tenantId, loanNumber])
+  @@index([tenantId, status])
+  @@map("loans")
+}
+
+model Borrower {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  loanId      String?  @map("loan_id") @db.Uuid
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  email       String?
+  phone       String?
+  ssn         String?
+  dob         DateTime? @db.Date
+  bureauFileId String? @map("bureau_file_id")
+  bankAccountNumber String? @map("bank_account_number")
+  createdAt   DateTime @map("created_at") @default(now())
+  updatedAt   DateTime @map("updated_at") @default(now()) @updatedAt
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  version     Int      @default(1)
+  loan        Loan?    @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, loanId])
+  @@map("borrowers")
+}
+
+model CoBorrower {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  email     String?
+  phone     String?
+  ssn       String?
+  dob       DateTime? @db.Date
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, loanId])
+  @@map("co_borrowers")
+}
+
+model LoanParty {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String   @map("loan_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  role      String
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@map("loan_parties")
+}
+
+model LoanState {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String   @map("loan_id") @db.Uuid
+  status    String
+  reason    String?
+  effectiveAt DateTime @map("effective_at") @default(now())
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("loan_states")
+}
+
+model Document {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  category  String?
+  uri       String?
+  status    String?
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@map("documents")
+}
+
+model Condition {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  description String?
+  status    String?
+  dueAt     DateTime? @map("due_at")
+  assigneeId String?  @map("assignee") @db.Uuid
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  assignee  User?     @relation("ConditionAssignee", fields: [assigneeId], references: [id])
+
+  @@index([tenantId, status, dueAt])
+  @@map("conditions")
+}
+
+model Task {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  title     String
+  description String?
+  status    String?
+  assigneeId  String?   @map("assignee") @db.Uuid
+  dueAt     DateTime? @map("due_at")
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  assignee  User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  @@index([tenantId, assigneeId, dueAt])
+  @@map("tasks")
+}
+
+model Communication {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  channel   String?
+  subject   String?
+  body      String?
+  actorId   String?   @map("actor") @db.Uuid
+  sentAt    DateTime? @map("sent_at")
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("CommunicationActor", fields: [actorId], references: [id])
+
+  @@map("communications")
+}
+
+model Clock {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  clockType String   @map("clock_type")
+  startedAt DateTime @map("started_at") @default(now())
+  stoppedAt DateTime? @map("stopped_at")
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("clocks")
+}
+
+model Disclosure {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  disclosureType String? @map("disclosure_type")
+  deliveredAt DateTime? @map("delivered_at")
+  status    String?
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("disclosures")
+}
+
+model Order {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  orderType String?  @map("order_type")
+  vendor    String?
+  status    String?
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("orders")
+}
+
+model PricingQuote {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  quote     Json?
+  effectiveAt DateTime? @map("effective_at")
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("pricing_quotes")
+}
+
+model RateLock {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  lockNumber String? @map("lock_number")
+  expiresAt DateTime? @map("expires_at")
+  status    String?
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("rate_locks")
+}
+
+model Finding {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  findingType String? @map("finding_type")
+  severity  String?
+  description String?
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("findings")
 }
 
 model Event {
-  id         String   @id @default(uuid())
-  tenantId   String
-  loanId     String?
-  type       String
-  payload    Json
-  occurredAt DateTime @default(now())
-  prevHash   String?
-  hash       String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  loan       Loan?    @relation(fields: [loanId], references: [id])
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  type      String
+  source    String?
+  actor     String?   @db.Uuid
+  payload   Json      @map("payload_jsonb")
+  occurredAt DateTime @map("occurred_at") @default(now())
+  prevHash  String?   @map("prev_hash")
+  hash      String
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  loan      Loan?     @relation(fields: [loanId], references: [id])
 
-  @@index([tenantId])
-  @@index([loanId])
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@map("events")
 }
 
-enum IdempotencyStatus {
-  PENDING
-  COMPLETED
-  REPLAYED
+model EventIntegrity {
+  id         String   @id @default(uuid()) @db.Uuid
+  runAt      DateTime @map("run_at") @default(now())
+  checkedFrom DateTime @map("checked_from")
+  checkedTo  DateTime @map("checked_to")
+  total      Int
+  mismatches Int
+  notes      Json?
+
+  @@map("events_integrity")
 }
 
-model VendorRequest {
-  id              String            @id @default(uuid())
-  tenantId        String
-  keyHash         String
-  requestHash     String
-  responseHash    String?
-  status          IdempotencyStatus @default(PENDING)
-  responsePayload Json?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+model AccessAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  resource  String
+  action    String
+  piiFields String[] @map("pii_fields")
+  reason    String
+  occurredAt DateTime @map("occurred_at") @default(now())
 
-  @@unique([tenantId, keyHash])
+  @@map("access_audit")
 }

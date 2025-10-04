@@ -34,6 +34,9 @@ importers:
       prettier:
         specifier: 3.2.5
         version: 3.2.5
+      prisma:
+        specifier: 5.22.0
+        version: 5.22.0
       turbo:
         specifier: 1.12.4
         version: 1.12.4
@@ -88,12 +91,12 @@ importers:
       jsonwebtoken:
         specifier: 9.0.2
         version: 9.0.2
+      pg:
+        specifier: 8.11.5
+        version: 8.11.5
       pino:
         specifier: 8.17.1
         version: 8.17.1
-      prisma:
-        specifier: 5.22.0
-        version: 5.22.0
       rxjs:
         specifier: 7.8.1
         version: 7.8.1
@@ -340,6 +343,7 @@ packages:
         integrity: sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg==,
       }
     engines: { node: '>=6.9.0' }
+    requiresBuild: true
     dependencies:
       '@babel/helper-validator-identifier': 7.27.1
       js-tokens: 4.0.0
@@ -352,6 +356,7 @@ packages:
         integrity: sha512-D2hP9eA+Sqx1kBZgzxZh0y1trbuU+JoDkiEwqhQ36nodYqJwyEIhPSdMNd7lOm/4io72luTPWH20Yda0xOuUow==,
       }
     engines: { node: '>=6.9.0' }
+    requiresBuild: true
     dev: true
 
   /@babel/runtime@7.28.4:
@@ -3733,14 +3738,12 @@ packages:
       {
         integrity: sha512-AUt44v3YJeggO2ZU5BkXI7M4hu9BF2zzH2iF2V5pyXT/lRTyWiElZ7It+bRH1EshoMRxHgpYg4VB6rCM+mG5jQ==,
       }
-    dev: false
 
   /@prisma/engines-version@5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2:
     resolution:
       {
         integrity: sha512-2PTmxFR2yHW/eB3uqWtcgRcgAbG1rwG9ZriSvQw+nnb7c4uCr3RAcGMb6/zfE88SKlC1Nj2ziUvc96Z379mHgQ==,
       }
-    dev: false
 
   /@prisma/engines@5.22.0:
     resolution:
@@ -3753,7 +3756,6 @@ packages:
       '@prisma/engines-version': 5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2
       '@prisma/fetch-engine': 5.22.0
       '@prisma/get-platform': 5.22.0
-    dev: false
 
   /@prisma/fetch-engine@5.22.0:
     resolution:
@@ -3764,7 +3766,6 @@ packages:
       '@prisma/debug': 5.22.0
       '@prisma/engines-version': 5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2
       '@prisma/get-platform': 5.22.0
-    dev: false
 
   /@prisma/get-platform@5.22.0:
     resolution:
@@ -3773,7 +3774,6 @@ packages:
       }
     dependencies:
       '@prisma/debug': 5.22.0
-    dev: false
 
   /@protobufjs/aspromise@1.1.2:
     resolution:
@@ -6880,6 +6880,7 @@ packages:
       {
         integrity: sha512-sqQamAnR14VgCr1A618A3sGrygcpK+HEbenA/HiEAkkUwcZIIB/tgWqHFxWgOyDh4nB4JCRimh79dR5Ywc9MDQ==,
       }
+    requiresBuild: true
     dependencies:
       is-arrayish: 0.2.1
     dev: true
@@ -7689,6 +7690,7 @@ packages:
       {
         integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==,
       }
+    requiresBuild: true
 
   /fastify-plugin@4.5.1:
     resolution:
@@ -8719,6 +8721,7 @@ packages:
       {
         integrity: sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==,
       }
+    requiresBuild: true
     dev: true
 
   /is-async-function@2.1.1:
@@ -9237,6 +9240,7 @@ packages:
       {
         integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==,
       }
+    requiresBuild: true
 
   /json-stable-stringify-without-jsonify@1.0.1:
     resolution:
@@ -10683,12 +10687,39 @@ packages:
       }
     dev: true
 
+  /pg-cloudflare@1.2.7:
+    resolution:
+      {
+        integrity: sha512-YgCtzMH0ptvZJslLM1ffsY4EuGaU0cx4XSdXLRFae8bPP4dS5xL1tNB3k2o/N64cHJpwU7dxKli/nZ2lUa5fLg==,
+      }
+    requiresBuild: true
+    dev: false
+    optional: true
+
+  /pg-connection-string@2.9.1:
+    resolution:
+      {
+        integrity: sha512-nkc6NpDcvPVpZXxrreI/FOtX3XemeLl8E0qFr6F2Lrm/I8WOnaWNhIPK2Z7OHpw7gh5XJThi6j6ppgNoaT1w4w==,
+      }
+    dev: false
+
   /pg-int8@1.0.1:
     resolution:
       {
         integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==,
       }
     engines: { node: '>=4.0.0' }
+    dev: false
+
+  /pg-pool@3.10.1(pg@8.11.5):
+    resolution:
+      {
+        integrity: sha512-Tu8jMlcX+9d8+QVzKIvM/uJtp07PKr82IUOYEphaWcoBhIYkoHpLXN3qO59nAI11ripznDsEzEv8nUxBVWajGg==,
+      }
+    peerDependencies:
+      pg: '>=8.0'
+    dependencies:
+      pg: 8.11.5
     dev: false
 
   /pg-protocol@1.10.3:
@@ -10710,6 +10741,36 @@ packages:
       postgres-bytea: 1.0.0
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+    dev: false
+
+  /pg@8.11.5:
+    resolution:
+      {
+        integrity: sha512-jqgNHSKL5cbDjFlHyYsCXmQDrfIX/3RsNwYqpd4N0Kt8niLuNoRNH+aazv6cOd43gPh9Y4DjQCtb+X0MH0Hvnw==,
+      }
+    engines: { node: '>= 8.0.0' }
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+    dependencies:
+      pg-connection-string: 2.9.1
+      pg-pool: 3.10.1(pg@8.11.5)
+      pg-protocol: 1.10.3
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.2.7
+    dev: false
+
+  /pgpass@1.0.5:
+    resolution:
+      {
+        integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==,
+      }
+    dependencies:
+      split2: 4.2.0
     dev: false
 
   /picocolors@1.1.1:
@@ -11025,7 +11086,6 @@ packages:
       '@prisma/engines': 5.22.0
     optionalDependencies:
       fsevents: 2.3.3
-    dev: false
 
   /process-warning@2.3.2:
     resolution:
@@ -11315,6 +11375,7 @@ packages:
         integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==,
       }
     engines: { node: '>=0.10.0' }
+    requiresBuild: true
 
   /require-in-the-middle@7.5.2:
     resolution:
