@@ -44,5 +44,8 @@
     "tsx": "4.7.0",
     "typescript": "5.4.3",
     "vitest": "1.4.0"
+  },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma"
   }
 }
