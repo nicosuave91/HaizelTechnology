@@ -1,0 +1,31 @@
+{
+  "name": "worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@haizel/config": "workspace:*",
+    "@haizel/observability": "workspace:*",
+    "@opentelemetry/api": "1.8.0",
+    "@temporalio/activity": "1.8.5",
+    "@temporalio/client": "1.8.5",
+    "@temporalio/worker": "1.8.5",
+    "pino": "8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.30",
+    "eslint": "8.57.0",
+    "tslib": "2.6.2",
+    "tsx": "4.7.0",
+    "typescript": "5.4.3",
+    "vitest": "1.4.0"
+  }
+}
