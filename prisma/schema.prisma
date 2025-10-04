@@ -22,6 +22,7 @@ model Tenant {
   featureFlags FeatureFlag[]
   apiKeys    ApiKey[]
   loans      Loan[]
+  events     Event[]
 
   @@map("tenants")
 }
