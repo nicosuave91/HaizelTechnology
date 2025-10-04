@@ -1,0 +1,36 @@
+{
+  "name": "haizel-blp",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@8.15.4",
+  "scripts": {
+    "postinstall": "husky install",
+    "dev": "turbo run dev --parallel --filter=web --filter=api --filter=worker",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "dev:up": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "dev:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "dev:reset": "docker compose -f infra/docker-compose.dev.yml down -v && docker compose -f infra/docker-compose.dev.yml up -d",
+    "db:migrate": "pnpm --filter api prisma migrate deploy",
+    "db:seed": "node scripts/seed.mjs",
+    "check-env": "node scripts/check-env.mjs",
+    "lint-staged": "lint-staged",
+    "commitlint": "commitlint"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "17.8.1",
+    "@commitlint/config-conventional": "17.8.1",
+    "@types/node": "20.11.30",
+    "cz-conventional-changelog": "3.3.0",
+    "dotenv": "16.4.1",
+    "husky": "9.0.7",
+    "lint-staged": "15.2.2",
+    "prettier": "3.2.5",
+    "turbo": "1.12.4",
+    "typescript": "5.4.3"
+  }
+}

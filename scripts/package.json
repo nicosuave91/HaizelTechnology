@@ -1,0 +1,8 @@
+{
+  "name": "@haizel/scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@prisma/client": "5.10.2"
+  }
+}
