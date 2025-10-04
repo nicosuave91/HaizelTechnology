@@ -1,4 +1,5 @@
 import { createLogger } from '@haizel/observability';
+import { emitLockAlert, markLockExpired, scheduleLockExpiry } from './lock.activities.js';
 
 const logger = createLogger('worker.activities');
 

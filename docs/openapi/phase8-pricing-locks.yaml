@@ -1,0 +1,469 @@
+openapi: 3.1.0
+info:
+  title: Haizel BLP Pricing & Locks API
+  version: 0.8.0
+servers:
+  - url: https://api.haizel.dev/v1
+paths:
+  /pricing/quotes:
+    post:
+      operationId: createPricingQuotes
+      summary: Request paired pricing scenarios from PPE
+      tags: [Pricing]
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingQuoteRequest'
+      responses:
+        '200':
+          description: Successful quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingQuoteResponse'
+  /locks:
+    post:
+      operationId: createRateLock
+      summary: Create a new rate lock
+      tags: [Locks]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LockCreateRequest'
+      responses:
+        '201':
+          description: Lock created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockResource'
+  /locks/{id}:extend:
+    post:
+      operationId: extendRateLock
+      summary: Extend a rate lock
+      tags: [Locks]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LockExtendRequest'
+      responses:
+        '200':
+          description: Lock extended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockResource'
+  /locks/{id}:float-down:
+    post:
+      operationId: floatDownRateLock
+      summary: Apply a float down to a rate lock
+      tags: [Locks]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+      responses:
+        '200':
+          description: Float down applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockResource'
+  /locks/{id}:void:
+    post:
+      operationId: voidRateLock
+      summary: Void a rate lock
+      tags: [Locks]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lock voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockResource'
+  /locks/watchlist:
+    get:
+      operationId: getLockWatchlist
+      summary: List locks expiring within SLA window
+      tags: [Locks]
+      parameters:
+        - in: query
+          name: lteHours
+          required: false
+          schema:
+            type: integer
+            default: 48
+            minimum: 1
+            maximum: 168
+      responses:
+        '200':
+          description: Locks near expiry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockWatchlistResponse'
+  /loans/{id}/exceptions:
+    post:
+      operationId: createLoanException
+      summary: Request an exception for a loan
+      tags: [Exceptions]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExceptionCreateRequest'
+      responses:
+        '201':
+          description: Exception created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionResource'
+  /exceptions/{id}:approve:
+    post:
+      operationId: approveException
+      summary: Approve a pending exception
+      tags: [Exceptions]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExceptionDecisionRequest'
+      responses:
+        '200':
+          description: Exception approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionResource'
+  /exceptions/{id}:deny:
+    post:
+      operationId: denyException
+      summary: Deny a pending exception
+      tags: [Exceptions]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExceptionDecisionRequest'
+      responses:
+        '200':
+          description: Exception denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionResource'
+  /exceptions:
+    get:
+      operationId: listExceptions
+      summary: List exceptions filtered by status
+      tags: [Exceptions]
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, denied, expired]
+      responses:
+        '200':
+          description: Exception collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionCollectionResponse'
+components:
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+  schemas:
+    PricingScenario:
+      type: object
+      required: [scenarioKey, fico, ltv, cltv, productCode, lockPeriodDays]
+      properties:
+        scenarioKey:
+          type: string
+        fico:
+          type: integer
+        ltv:
+          type: number
+        cltv:
+          type: number
+        productCode:
+          type: string
+        pointsCap:
+          type: number
+        lockPeriodDays:
+          type: integer
+        occupancy:
+          type: string
+        dti:
+          type: number
+        ausFinding:
+          type: string
+        overlays:
+          type: array
+          items:
+            type: string
+    PricingQuoteRequest:
+      type: object
+      properties:
+        loanId:
+          type: string
+          format: uuid
+        scenarioA:
+          $ref: '#/components/schemas/PricingScenario'
+        scenarioB:
+          $ref: '#/components/schemas/PricingScenario'
+      required: [scenarioA, scenarioB]
+    LlpaBreakdownItem:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+    PricingScenarioResult:
+      type: object
+      properties:
+        scenarioKey:
+          type: string
+        eligibility:
+          type: object
+        rate:
+          type: number
+        price:
+          type: number
+        lockPeriodDays:
+          type: integer
+        llpas:
+          type: array
+          items:
+            $ref: '#/components/schemas/LlpaBreakdownItem'
+        costItems:
+          type: array
+          items:
+            type: object
+    PricingComparison:
+      type: object
+      properties:
+        deltaRate:
+          type: number
+        deltaPrice:
+          type: number
+        llpaBreakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/LlpaBreakdownItem'
+    PricingQuoteResponse:
+      type: object
+      properties:
+        scenarioA:
+          $ref: '#/components/schemas/PricingScenarioResult'
+        scenarioB:
+          $ref: '#/components/schemas/PricingScenarioResult'
+        comparison:
+          $ref: '#/components/schemas/PricingComparison'
+    LockResource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [new, locked, extended, expired, voided, float_down_applied]
+        lockedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lockPeriodDays:
+          type: integer
+        productRef:
+          type: string
+        rate:
+          type: number
+        price:
+          type: number
+        actions:
+          type: array
+          items:
+            type: object
+    LockCreateRequest:
+      type: object
+      required: [loanId, productRef, rate, price, lockPeriodDays]
+      properties:
+        loanId:
+          type: string
+          format: uuid
+        productRef:
+          type: string
+        rate:
+          type: number
+        price:
+          type: number
+        lockPeriodDays:
+          type: integer
+    LockExtendRequest:
+      type: object
+      required: [days]
+      properties:
+        days:
+          type: integer
+          minimum: 1
+          maximum: 30
+        reason:
+          type: string
+    LockWatchlistResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LockResource'
+    ExceptionCreateRequest:
+      type: object
+      required: [ruleCode, type, justification]
+      properties:
+        ruleCode:
+          type: string
+        pricingCode:
+          type: string
+        type:
+          type: string
+          enum: [pricing, overlay, uw]
+        justification:
+          type: string
+        scope:
+          type: string
+          enum: [loan, tenant]
+        expiresAt:
+          type: string
+          format: date-time
+    ExceptionDecisionRequest:
+      type: object
+      required: [justification]
+      properties:
+        justification:
+          type: string
+    ExceptionResource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+        ruleCode:
+          type: string
+        pricingCode:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, denied, expired]
+        scope:
+          type: string
+          enum: [loan, tenant]
+        justification:
+          type: string
+        requestedBy:
+          type: string
+        approverUserId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        auditTrail:
+          type: array
+          items:
+            type: object
+    ExceptionCollectionResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExceptionResource'

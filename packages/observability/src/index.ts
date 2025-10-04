@@ -23,7 +23,7 @@ export const startObservability = async (options: ObservabilityOptions) => {
     traceExporter: new OTLPTraceExporter({ url: `${options.otlpEndpoint}/v1/traces` }),
     metricExporter: new OTLPMetricExporter({ url: `${options.otlpEndpoint}/v1/metrics` }),
     instrumentations: [getNodeAutoInstrumentations()],
-  });
+  } as any);
 
   await sdk.start();
   return sdk;
@@ -37,3 +37,4 @@ export const stopObservability = async () => {
 };
 
 export * from './logger.js';
+export * from './pricingLocksTelemetry.js';
