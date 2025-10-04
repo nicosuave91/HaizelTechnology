@@ -1,0 +1,22 @@
+{
+  "name": "@haizel/rules-dsl",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "decimal.js-light": "2.5.1",
+    "expr-eval": "2.0.2"
+  },
+  "devDependencies": {
+    "tsup": "7.2.0",
+    "vitest": "1.4.0"
+  }
+}
