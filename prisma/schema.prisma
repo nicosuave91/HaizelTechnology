@@ -149,6 +149,131 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
+model Vendor {
+  id        String           @id @default(uuid()) @db.Uuid
+  category  String
+  name      String
+  slug      String?          @unique
+  active    Boolean          @default(true)
+  createdAt DateTime         @map("created_at") @default(now())
+  updatedAt DateTime         @map("updated_at") @default(now()) @updatedAt
+  createdBy String?          @map("created_by") @db.Uuid
+  updatedBy String?          @map("updated_by") @db.Uuid
+  version   Int              @default(1)
+  accounts  VendorAccount[]
+  requests  VendorRequest[]
+  webhooks  Webhook[]
+  orders    Order[]
+
+  @@map("vendors")
+}
+
+model VendorAccount {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  vendorId       String          @map("vendor_id") @db.Uuid
+  credentialsRef String          @map("credentials_ref")
+  sandbox        Boolean         @map("sandbox_bool") @default(false)
+  status         String?         @default("active")
+  metadata       Json?
+  lastValidatedAt DateTime?      @map("last_validated_at")
+  createdAt      DateTime        @map("created_at") @default(now())
+  updatedAt      DateTime        @map("updated_at") @default(now()) @updatedAt
+  createdBy      String?         @map("created_by") @db.Uuid
+  updatedBy      String?         @map("updated_by") @db.Uuid
+  version        Int             @default(1)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  vendor         Vendor          @relation(fields: [vendorId], references: [id])
+  requests       VendorRequest[]
+
+  @@unique([tenantId, vendorId, sandbox])
+  @@index([tenantId, status])
+  @@map("vendor_accounts")
+}
+
+model VendorRequest {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  vendorId        String           @map("vendor_id") @db.Uuid
+  vendorAccountId String?          @map("vendor_account_id") @db.Uuid
+  loanId          String?          @map("loan_id") @db.Uuid
+  actorId         String?          @map("actor_id") @db.Uuid
+  service         String
+  idempotencyKey  String           @map("idempotency_key")
+  externalId      String?          @map("external_id")
+  payloadDigest   String?          @map("payload_digest")
+  payloadUri      String?          @map("payload_uri")
+  payload         Bytes?           @db.Bytea
+  headers         Json?            @map("headers_json")
+  sentAt          DateTime?        @map("sent_at")
+  completedAt     DateTime?        @map("completed_at")
+  retryCount      Int              @map("retry_count") @default(0)
+  createdAt       DateTime         @map("created_at") @default(now())
+  updatedAt       DateTime         @map("updated_at") @default(now()) @updatedAt
+  createdBy       String?          @map("created_by") @db.Uuid
+  updatedBy       String?          @map("updated_by") @db.Uuid
+  version         Int              @default(1)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  vendor          Vendor           @relation(fields: [vendorId], references: [id])
+  vendorAccount   VendorAccount?   @relation(fields: [vendorAccountId], references: [id])
+  loan            Loan?            @relation(fields: [loanId], references: [id])
+  response        VendorResponse?  @relation("VendorRequestResponse")
+  webhooks        Webhook[]
+  orders          Order[]
+
+  @@unique([tenantId, vendorId, idempotencyKey])
+  @@index([tenantId, loanId, createdAt])
+  @@index([tenantId, service])
+  @@map("vendor_requests")
+}
+
+model VendorResponse {
+  id          String         @id @default(uuid()) @db.Uuid
+  requestId   String         @map("request_id") @db.Uuid
+  status      String
+  payloadUri  String?        @map("payload_uri")
+  payload     Bytes?         @db.Bytea
+  errorCode   String?        @map("error_code")
+  errorMessage String?       @map("error_message")
+  receivedAt  DateTime       @map("received_at") @default(now())
+  latencyMs   Int?           @map("latency_ms")
+  createdAt   DateTime       @map("created_at") @default(now())
+  updatedAt   DateTime       @map("updated_at") @default(now()) @updatedAt
+  createdBy   String?        @map("created_by") @db.Uuid
+  updatedBy   String?        @map("updated_by") @db.Uuid
+  version     Int            @default(1)
+  request     VendorRequest  @relation("VendorRequestResponse", fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_responses")
+}
+
+model Webhook {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  vendorId        String         @map("vendor_id") @db.Uuid
+  requestId       String?        @map("request_id") @db.Uuid
+  topic           String
+  receivedSig     String         @map("received_sig")
+  signatureDigest String         @map("signature_digest")
+  payloadUri      String?        @map("payload_uri")
+  payload         Bytes?         @db.Bytea
+  receivedAt      DateTime       @map("received_at") @default(now())
+  verified        Boolean        @map("verified_bool") @default(false)
+  replayed        Boolean        @map("replayed_bool") @default(false)
+  createdAt       DateTime       @map("created_at") @default(now())
+  updatedAt       DateTime       @map("updated_at") @default(now()) @updatedAt
+  createdBy       String?        @map("created_by") @db.Uuid
+  updatedBy       String?        @map("updated_by") @db.Uuid
+  version         Int            @default(1)
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  vendor          Vendor         @relation(fields: [vendorId], references: [id])
+  request         VendorRequest? @relation(fields: [requestId], references: [id])
+
+  @@unique([tenantId, vendorId, signatureDigest])
+  @@index([tenantId, receivedAt])
+  @@map("webhooks")
+}
+
 model ApiKey {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
@@ -440,10 +565,16 @@ model Document {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   loanId    String?  @map("loan_id") @db.Uuid
+  documentType String? @map("type")
   category  String?
+  filename  String?   @map("filename")
   uri       String?
+  storageUri String?  @map("storage_uri")
+  contentHash String? @map("content_hash")
   status    String?
   dataClassification String @map("data_classification") @default("internal")
+  classification String? @map("classification")
+  signedAt  DateTime? @map("signed_at")
   createdAt DateTime  @map("created_at") @default(now())
   updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
   createdBy String?   @map("created_by") @db.Uuid
@@ -452,6 +583,8 @@ model Document {
   loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
+  @@index([tenantId, loanId, createdAt])
+  @@index([tenantId, documentType])
   @@map("documents")
 }
 
@@ -561,8 +694,11 @@ model Clock {
   tenantId  String   @map("tenant_id") @db.Uuid
   loanId    String?  @map("loan_id") @db.Uuid
   clockType String   @map("clock_type")
+  state     String   @default("running")
   startedAt DateTime @map("started_at") @default(now())
+  dueAt     DateTime? @map("due_at")
   stoppedAt DateTime? @map("stopped_at")
+  reason    String?   @map("reason")
   createdAt DateTime  @map("created_at") @default(now())
   updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
   createdBy String?   @map("created_by") @db.Uuid
@@ -570,6 +706,8 @@ model Clock {
   version   Int       @default(1)
   loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId, loanId])
+  @@index([tenantId, clockType, state])
   @@map("clocks")
 }
 
@@ -578,7 +716,11 @@ model Disclosure {
   tenantId  String   @map("tenant_id") @db.Uuid
   loanId    String?  @map("loan_id") @db.Uuid
   disclosureType String? @map("disclosure_type")
+  disclosureVersion Int? @map("disclosure_version")
+  issuedAt  DateTime? @map("issued_at")
   deliveredAt DateTime? @map("delivered_at")
+  proofUri  String?  @map("proof_uri")
+  gatesSnapshot Json? @map("gates_snapshot")
   status    String?
   createdAt DateTime  @map("created_at") @default(now())
   updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
@@ -587,34 +729,37 @@ model Disclosure {
   version   Int       @default(1)
   loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId, loanId, issuedAt])
+  @@index([tenantId, disclosureType])
   @@map("disclosures")
 }
 
 model Order {
-  id             String        @id @default(uuid()) @db.Uuid
-  tenantId       String        @map("tenant_id") @db.Uuid
-  loanId         String?       @map("loan_id") @db.Uuid
-  service        OrderService  @map("service")
-  status         OrderStatus   @default(PENDING)
-  vendorId       String?       @map("vendor_id") @db.Uuid
-  vendorAccountId String?      @map("vendor_account_id") @db.Uuid
-  slaDueAt       DateTime?     @map("sla_due_at")
-  cost           Decimal?      @db.Decimal(14, 2)
-  requestJson    Json?         @map("request_json")
-  responseJson   Json?         @map("response_json")
-  metadata       Json?         @map("metadata_jsonb")
-  createdAt      DateTime      @map("created_at") @default(now())
-  updatedAt      DateTime      @map("updated_at") @default(now()) @updatedAt
-  createdBy      String?       @map("created_by") @db.Uuid
-  updatedBy      String?       @map("updated_by") @db.Uuid
-  version        Int           @default(1)
-  loan           Loan?         @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  vendor         Vendor?       @relation(fields: [vendorId], references: [id])
-  vendorAccount  VendorAccount? @relation(fields: [vendorAccountId], references: [id])
-  requests       VendorRequest[]
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  loanId    String?  @map("loan_id") @db.Uuid
+  orderType String?  @map("order_type")
+  service   String?  @map("service")
+  vendorId  String?  @map("vendor_id") @db.Uuid
+  vendorRequestId String? @map("vendor_request_id") @db.Uuid
+  vendor    String?
+  status    String?
+  requestJson Json?  @map("request_json")
+  responseJson Json? @map("response_json")
+  slaDueAt  DateTime? @map("sla_due_at")
+  completedAt DateTime? @map("completed_at")
+  cost      Decimal?  @db.Decimal(12, 2)
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  vendorRef Vendor?   @relation(fields: [vendorId], references: [id])
+  vendorRequest VendorRequest? @relation(fields: [vendorRequestId], references: [id])
 
-  @@index([tenantId, status, service])
-  @@index([tenantId, loanId])
+  @@index([tenantId, loanId, createdAt])
+  @@index([tenantId, service])
   @@map("orders")
 }
 
