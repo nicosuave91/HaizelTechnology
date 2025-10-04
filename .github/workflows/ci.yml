@@ -23,7 +23,7 @@ jobs:
           cache: 'pnpm'
       - name: Copy example environment
         run: cp .env.example .env
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --recursive --frozen-lockfile
         env:
           PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
           PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
