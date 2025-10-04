@@ -18,6 +18,7 @@ export interface ProblemJson {
 export interface LoanSummary {
   id: string;
   tenantId: string;
+  userId: string;
   loanNumber: string;
   status: string;
   amount: string;

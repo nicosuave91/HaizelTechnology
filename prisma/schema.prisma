@@ -37,6 +37,7 @@ model User {
 model Loan {
   id           String   @id @default(uuid())
   tenantId     String
+  userId       String
   loanNumber   String
   status       String
   amount       Decimal  @db.Decimal(14, 2)
@@ -44,9 +45,11 @@ model Loan {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
   events       Event[]
 
   @@index([tenantId])
+  @@index([userId])
   @@unique([tenantId, loanNumber])
 }
 

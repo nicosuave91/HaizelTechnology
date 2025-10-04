@@ -16,6 +16,7 @@ export class LoansService {
     return loans.map((loan) => ({
       id: loan.id,
       tenantId: loan.tenantId,
+      userId: loan.userId,
       loanNumber: loan.loanNumber,
       status: loan.status,
       amount: loan.amount.toString(),

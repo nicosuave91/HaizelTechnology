@@ -23,7 +23,7 @@ async function seed() {
       },
     });
 
-    await Promise.all([
+    const [loanOfficer] = await Promise.all([
       tx.user.upsert({
         where: { tenantId_email: { tenantId: tenantAlpha.id, email: 'lo@alpha.dev' } },
         update: {},
@@ -61,6 +61,7 @@ async function seed() {
       update: {},
       create: {
         tenantId: tenantAlpha.id,
+        userId: loanOfficer.id,
         loanNumber: 'HL-1001',
         status: 'in_review',
         amount: 350000,

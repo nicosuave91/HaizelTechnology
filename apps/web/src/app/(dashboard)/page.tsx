@@ -6,6 +6,7 @@ import { getFeatureClient } from '../../lib/featureFlags';
 
 interface LoanResponse {
   id: string;
+  userId: string;
   loanNumber: string;
   status: string;
   borrowerName: string;
