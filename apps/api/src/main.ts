@@ -18,13 +18,15 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-  await app.register(helmet);
-  await app.register(cors, { origin: true });
+  await app.register(helmet as unknown as Parameters<typeof app.register>[0]);
+  await app.register(cors as unknown as Parameters<typeof app.register>[0], { origin: true });
 
   app.useGlobalFilters(new ProblemJsonFilter());
-  app.addHook('onRequest', requestContextHook);
 
-  await app.listen({ port: config.api.API_PORT, host: config.api.API_HOST });
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onRequest', requestContextHook as any);
+
+  await app.listen(config.api.API_PORT, config.api.API_HOST);
 }
 
 bootstrap().catch((error) => {

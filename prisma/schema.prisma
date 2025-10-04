@@ -27,6 +27,10 @@ model Tenant {
   events     Event[]
   drDrills   DisasterRecoveryDrill[]
   accessAudits AccessAudit[]
+  pricingQuotes PricingQuote[]
+  rateLocks RateLock[]
+  exceptions Exception[]
+  vendorRequests VendorRequest[]
 
   @@map("tenants")
 }
@@ -164,6 +168,7 @@ model Loan {
   rateLocks   RateLock[]
   findings    Finding[]
   events      Event[]
+  exceptions  Exception[]
 
   @@unique([tenantId, loanNumber])
   @@index([tenantId, status])
@@ -306,19 +311,100 @@ model RuleFinding {
   @@map("rule_findings")
 }
 
-model RuleException {
-  id              String    @id @default(uuid()) @db.Uuid
-  loanId          String    @map("loan_id") @db.Uuid
-  ruleCode        String    @map("rule_code")
-  justification   String
-  approverUserId  String?   @map("approver_user_id") @db.Uuid
-  scope           String
-  expiresAt       DateTime? @map("expires_at")
-  createdAt       DateTime  @map("created_at") @default(now())
-  updatedAt       DateTime  @map("updated_at") @default(now()) @updatedAt
-  loan            Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+enum RateLockStatus {
+  new
+  locked
+  extended
+  expired
+  voided
+  float_down_applied
+}
 
-  @@index([loanId])
+enum ExceptionType {
+  pricing
+  overlay
+  uw
+}
+
+enum ExceptionStatus {
+  pending
+  approved
+  denied
+  expired
+}
+
+enum ExceptionScope {
+  loan
+  tenant
+}
+
+model PricingQuote {
+  id             String   @id @default(uuid()) @db.Uuid
+  loanId         String?  @map("loan_id") @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  ppe            String
+  scenarioKey    String   @map("scenario_key")
+  eligibility    Json     @map("eligibility_json")
+  rate           Decimal  @db.Decimal(8, 4)
+  price          Decimal  @db.Decimal(10, 4)
+  lockPeriod     Int      @map("lock_period")
+  llpas          Json     @map("llpas_json")
+  costItems      Json     @map("cost_items_json")
+  rawPayloadUri  String?  @map("raw_payload_uri")
+  createdAt      DateTime @map("created_at") @default(now())
+  loan           Loan?    @relation(fields: [loanId], references: [id])
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([loanId, createdAt(sort: Desc)])
+  @@map("pricing_quotes")
+}
+
+model RateLock {
+  id             String         @id @default(uuid()) @db.Uuid
+  loanId         String         @map("loan_id") @db.Uuid
+  status         RateLockStatus
+  lockedAt       DateTime?      @map("locked_at")
+  expiresAt      DateTime       @map("expires_at")
+  lockPeriodDays Int            @map("lock_period_days")
+  productRef     String         @map("product_ref")
+  rate           Decimal        @db.Decimal(8, 4)
+  price          Decimal        @db.Decimal(10, 4)
+  actions        Json           @map("actions_json")
+  createdBy      String?        @map("created_by") @db.Uuid
+  updatedAt      DateTime       @map("updated_at") @default(now()) @updatedAt
+  tenantId       String         @map("tenant_id") @db.Uuid
+  loan           Loan           @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+
+  @@index([loanId, status])
+  @@index([expiresAt])
+  @@index([tenantId, status])
+  @@map("rate_locks")
+}
+
+model Exception {
+  id              String           @id @default(uuid()) @db.Uuid
+  loanId          String           @map("loan_id") @db.Uuid
+  ruleCode        String           @map("rule_code")
+  pricingCode     String?          @map("pricing_code")
+  type            ExceptionType
+  justification   String
+  requestedBy     String           @map("requested_by") @db.Uuid
+  approverUserId  String?          @map("approver_user_id") @db.Uuid
+  status          ExceptionStatus
+  scope           ExceptionScope
+  expiresAt       DateTime?        @map("expires_at")
+  createdAt       DateTime         @map("created_at") @default(now())
+  updatedAt       DateTime         @map("updated_at") @default(now()) @updatedAt
+  tenantId        String           @map("tenant_id") @db.Uuid
+  auditTrail      Json             @map("audit_trail_json")
+  loan            Loan             @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+
+  @@index([loanId, status])
+  @@index([expiresAt])
+  @@index([tenantId, status])
   @@map("exceptions")
 }
 
@@ -535,39 +621,6 @@ model Order {
   @@map("orders")
 }
 
-model PricingQuote {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  loanId    String?  @map("loan_id") @db.Uuid
-  quote     Json?
-  effectiveAt DateTime? @map("effective_at")
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
-  createdBy String?   @map("created_by") @db.Uuid
-  updatedBy String?   @map("updated_by") @db.Uuid
-  version   Int       @default(1)
-  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-
-  @@map("pricing_quotes")
-}
-
-model RateLock {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  loanId    String?  @map("loan_id") @db.Uuid
-  lockNumber String? @map("lock_number")
-  expiresAt DateTime? @map("expires_at")
-  status    String?
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @default(now()) @updatedAt
-  createdBy String?   @map("created_by") @db.Uuid
-  updatedBy String?   @map("updated_by") @db.Uuid
-  version   Int       @default(1)
-  loan      Loan?     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-
-  @@map("rate_locks")
-}
-
 model Finding {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
@@ -620,6 +673,21 @@ model EventIntegrity {
   notes      Json?
 
   @@map("events_integrity")
+}
+
+model VendorRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  keyHash         String   @map("key_hash")
+  requestHash     String   @map("request_hash")
+  responseHash    String?  @map("response_hash")
+  responsePayload Json?    @map("response_payload_json")
+  status          String
+  createdAt       DateTime @map("created_at") @default(now())
+  updatedAt       DateTime @map("updated_at") @default(now()) @updatedAt
+
+  @@unique([tenantId, keyHash])
+  @@map("vendor_requests")
 }
 
 model DisasterRecoveryDrill {

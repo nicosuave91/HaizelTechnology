@@ -33,7 +33,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
       }),
     ).pipe(
       switchMap((record) => {
-        if (record.status === 'COMPLETED') {
+        const current = record as { status: string };
+
+        if (current.status === 'COMPLETED') {
           throw new ConflictException({ message: 'Idempotent replay', code: 'IDEMPOTENT_REPLAY' });
         }
 
