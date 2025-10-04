@@ -29,11 +29,12 @@ jobs:
           PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
           PRISMA_CLIENT_ENGINE_TYPE: 'binary'
       - name: Install API dependencies
+        working-directory: apps/api
         env:
           PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
           PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
           PRISMA_CLIENT_ENGINE_TYPE: 'binary'
-        run: pnpm --filter api install --frozen-lockfile --prod false
+        run: pnpm install --frozen-lockfile
       - name: Generate Prisma Client
         env:
           PRISMA_GENERATE_SKIP_AUTOINSTALL: '1'
