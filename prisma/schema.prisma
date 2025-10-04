@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("API_POSTGRES_URL")
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  theme     Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  loans     Loan[]
+  events    Event[]
+}
+
+model User {
+  id        String     @id @default(uuid())
+  tenantId  String
+  email     String
+  name      String
+  role      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  loans     Loan[]
+
+  @@index([tenantId])
+  @@unique([tenantId, email])
+}
+
+model Loan {
+  id           String   @id @default(uuid())
+  tenantId     String
+  loanNumber   String
+  status       String
+  amount       Decimal  @db.Decimal(14, 2)
+  borrowerName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  events       Event[]
+
+  @@index([tenantId])
+  @@unique([tenantId, loanNumber])
+}
+
+model Event {
+  id         String   @id @default(uuid())
+  tenantId   String
+  loanId     String?
+  type       String
+  payload    Json
+  occurredAt DateTime @default(now())
+  prevHash   String?
+  hash       String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  loan       Loan?    @relation(fields: [loanId], references: [id])
+
+  @@index([tenantId])
+  @@index([loanId])
+}
+
+enum IdempotencyStatus {
+  PENDING
+  COMPLETED
+  REPLAYED
+}
+
+model VendorRequest {
+  id              String            @id @default(uuid())
+  tenantId        String
+  keyHash         String
+  requestHash     String
+  responseHash    String?
+  status          IdempotencyStatus @default(PENDING)
+  responsePayload Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([tenantId, keyHash])
+}

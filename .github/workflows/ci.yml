@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Copy example environment
+        run: cp .env.example .env
+      - run: pnpm install --frozen-lockfile
+        env:
+          PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
+          PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
+          PRISMA_CLIENT_ENGINE_TYPE: 'binary'
+      - name: Generate Prisma Client
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1'
+          PRISMA_CLI_QUERY_ENGINE_TYPE: 'binary'
+          PRISMA_CLIENT_ENGINE_TYPE: 'binary'
+        run: pnpm --filter api prisma generate
+      - run: pnpm check-env
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
