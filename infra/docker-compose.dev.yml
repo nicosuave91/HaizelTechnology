@@ -1,0 +1,109 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: haizel
+      POSTGRES_PASSWORD: haizel
+      POSTGRES_DB: haizel
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  temporal:
+    image: temporalio/auto-setup:1.21.3
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: haizel
+      POSTGRES_PWD: haizel
+      POSTGRES_SEEDS: postgres
+    ports:
+      - '7233:7233'
+    depends_on:
+      - postgres
+
+  temporal-ui:
+    image: temporalio/ui:2.24.0
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - '8233:8080'
+    depends_on:
+      - temporal
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '8025:8025'
+      - '1025:1025'
+
+  minio:
+    image: minio/minio:RELEASE.2024-02-17T01-15-57Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.92.0
+    command: ["--config=/etc/otel-collector/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel-collector/config.yaml:ro
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    ports:
+      - '16686:16686'
+      - '14268:14268'
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+
+  loki:
+    image: grafana/loki:2.9.4
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - '3100:3100'
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /var/log:/var/log
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:10.3.1
+    ports:
+      - '3002:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  postgres-data:
+  minio-data:
+  grafana-data:

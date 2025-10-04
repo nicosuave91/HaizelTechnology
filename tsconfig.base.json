@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": false,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@haizel/config": ["packages/config/src/index.ts"],
+      "@haizel/types": ["packages/types/src/index.ts"],
+      "@haizel/observability": ["packages/observability/src/index.ts"],
+      "@haizel/eslint": ["packages/eslint/src/index.ts"],
+      "@config/*": ["packages/config/src/*"],
+      "@types/*": ["packages/types/src/*"],
+      "@observability/*": ["packages/observability/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build"]
+}

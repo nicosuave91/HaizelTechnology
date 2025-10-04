@@ -1,0 +1,13 @@
+{
+  "title": "Haizel Platform Overview",
+  "panels": [
+    {
+      "type": "text",
+      "title": "Instructions",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 4 },
+      "options": { "content": "Use Jaeger for traces and Tempo for distributed context." }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
