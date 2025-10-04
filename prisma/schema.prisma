@@ -170,6 +170,158 @@ model Loan {
   @@map("loans")
 }
 
+enum RuleResult {
+  pass
+  warn
+  fail
+}
+
+enum RuleOverlayScope {
+  tenant
+  investor
+  state
+}
+
+model RuleCatalog {
+  id           String          @id @default(uuid()) @db.Uuid
+  code         String          @unique
+  title        String
+  description  String?
+  jurisdiction String?
+  citations    String[]
+  createdAt    DateTime        @map("created_at") @default(now())
+  updatedAt    DateTime        @map("updated_at") @default(now()) @updatedAt
+  createdBy    String?         @map("created_by") @db.Uuid
+  updatedBy    String?         @map("updated_by") @db.Uuid
+  versions     RuleVersion[]
+
+  @@map("rule_catalog")
+}
+
+model RuleVersion {
+  id               String           @id @default(uuid()) @db.Uuid
+  catalogId        String           @map("catalog_id") @db.Uuid
+  versionInt       Int              @map("version_int")
+  effectiveFrom    DateTime?        @map("effective_from")
+  effectiveTo      DateTime?        @map("effective_to")
+  severity         String
+  dslJson          Json             @map("dsl_json")
+  inputsSchema     Json             @map("inputs_schema")
+  outputsSchema    Json             @map("outputs_schema")
+  dependencies     String[]
+  status           String           @default("draft")
+  createdAt        DateTime         @map("created_at") @default(now())
+  updatedAt        DateTime         @map("updated_at") @default(now()) @updatedAt
+  createdBy        String?          @map("created_by") @db.Uuid
+  updatedBy        String?          @map("updated_by") @db.Uuid
+  catalog          RuleCatalog      @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  overlays         RuleOverlay[]
+  tests            RuleTest[]
+  runs             RuleRun[]
+
+  @@unique([catalogId, versionInt])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+  @@map("rule_versions")
+}
+
+model RuleOverlay {
+  id            String             @id @default(uuid()) @db.Uuid
+  scope         RuleOverlayScope
+  scopeRef      String             @map("scope_ref")
+  ruleVersionId String             @map("rule_version_id") @db.Uuid
+  overlayDsl    Json               @map("overlay_dsl_json")
+  effectiveFrom DateTime?          @map("effective_from")
+  effectiveTo   DateTime?          @map("effective_to")
+  createdAt     DateTime           @map("created_at") @default(now())
+  updatedAt     DateTime           @map("updated_at") @default(now()) @updatedAt
+  createdBy     String?            @map("created_by") @db.Uuid
+  updatedBy     String?            @map("updated_by") @db.Uuid
+  ruleVersion   RuleVersion        @relation(fields: [ruleVersionId], references: [id], onDelete: Cascade)
+
+  @@index([ruleVersionId])
+  @@index([scope, scopeRef])
+  @@map("overlays")
+}
+
+model RuleTest {
+  id                 String      @id @default(uuid()) @db.Uuid
+  ruleVersionId      String      @map("rule_version_id") @db.Uuid
+  name               String
+  inputFixtureJson   Json        @map("input_fixture_json")
+  expectedOutputJson Json        @map("expected_output_json")
+  createdAt          DateTime    @map("created_at") @default(now())
+  updatedAt          DateTime    @map("updated_at") @default(now()) @updatedAt
+  createdBy          String?     @map("created_by") @db.Uuid
+  updatedBy          String?     @map("updated_by") @db.Uuid
+  ruleVersion        RuleVersion @relation(fields: [ruleVersionId], references: [id], onDelete: Cascade)
+
+  @@index([ruleVersionId])
+  @@map("rule_tests")
+}
+
+model RuleRun {
+  id                 String      @id @default(uuid()) @db.Uuid
+  tenantId           String      @map("tenant_id") @db.Uuid
+  loanId             String?     @map("loan_id") @db.Uuid
+  ruleVersionId      String      @map("rule_version_id") @db.Uuid
+  inputsSnapshotJson Json        @map("inputs_snapshot_json")
+  inputsSnapshotHash String      @map("inputs_snapshot_hash")
+  result             RuleResult
+  outputsJson        Json        @map("outputs_json")
+  evaluatedAt        DateTime    @map("evaluated_at") @default(now())
+  latencyMs          Int         @map("latency_ms")
+  createdAt          DateTime    @map("created_at") @default(now())
+  ruleVersion        RuleVersion @relation(fields: [ruleVersionId], references: [id], onDelete: Cascade)
+  findings           RuleFinding[]
+  tenant             Tenant      @relation(fields: [tenantId], references: [id])
+  loan               Loan?       @relation(fields: [loanId], references: [id])
+
+  @@index([tenantId, evaluatedAt])
+  @@index([ruleVersionId])
+  @@map("rule_runs")
+}
+
+model RuleFinding {
+  id             String     @id @default(uuid()) @db.Uuid
+  loanId         String?    @map("loan_id") @db.Uuid
+  ruleRunId      String     @map("rule_run_id") @db.Uuid
+  code           String
+  severity       String
+  message        String
+  explain        String
+  ruleVersionId  String     @map("rule_version_id") @db.Uuid
+  citations      String[]
+  actionsJson    Json       @map("actions_json")
+  resolved       Boolean    @map("resolved_bool") @default(false)
+  resolvedAt     DateTime?  @map("resolved_at")
+  resolverUserId String?    @map("resolver_user_id") @db.Uuid
+  createdAt      DateTime   @map("created_at") @default(now())
+  updatedAt      DateTime   @map("updated_at") @default(now()) @updatedAt
+  ruleRun        RuleRun    @relation(fields: [ruleRunId], references: [id], onDelete: Cascade)
+  loan           Loan?      @relation(fields: [loanId], references: [id])
+
+  @@index([ruleRunId])
+  @@index([loanId])
+  @@map("rule_findings")
+}
+
+model RuleException {
+  id              String    @id @default(uuid()) @db.Uuid
+  loanId          String    @map("loan_id") @db.Uuid
+  ruleCode        String    @map("rule_code")
+  justification   String
+  approverUserId  String?   @map("approver_user_id") @db.Uuid
+  scope           String
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @map("created_at") @default(now())
+  updatedAt       DateTime  @map("updated_at") @default(now()) @updatedAt
+  loan            Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId])
+  @@map("exceptions")
+}
+
 model Borrower {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
