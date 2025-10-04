@@ -1,4 +1,6 @@
+const baseConfig = require('@haizel/eslint');
+
 module.exports = {
-  extends: ['@haizel/eslint'],
-  ignorePatterns: ['node_modules', 'dist', '.turbo']
+  ...baseConfig,
+  ignorePatterns: Array.from(new Set([...(baseConfig.ignorePatterns ?? []), 'node_modules', 'dist', '.turbo'])),
 };
