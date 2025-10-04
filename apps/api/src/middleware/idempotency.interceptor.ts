@@ -3,6 +3,7 @@ import { Observable, from } from 'rxjs';
 import { tap, switchMap } from 'rxjs/operators';
 import { PrismaService } from '../common/prisma.service.js';
 import { createHash } from 'node:crypto';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
@@ -27,15 +28,13 @@ export class IdempotencyInterceptor implements NestInterceptor {
           tenantId,
           keyHash,
           requestHash,
-          status: 'PENDING',
+          status: OrderStatus.PENDING,
         },
         update: {},
       }),
     ).pipe(
       switchMap((record) => {
-        const current = record as { status: string };
-
-        if (current.status === 'COMPLETED') {
+        if (record.status === OrderStatus.COMPLETED) {
           throw new ConflictException({ message: 'Idempotent replay', code: 'IDEMPOTENT_REPLAY' });
         }
 
@@ -47,7 +46,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
               data: {
                 responseHash,
                 responsePayload: response,
-                status: 'COMPLETED',
+                status: OrderStatus.COMPLETED,
               },
             });
           }),

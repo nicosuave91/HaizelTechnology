@@ -3,9 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { LoansModule } from './modules/loans/loans.module.js';
-import { PricingModule } from './modules/pricing/pricing.module.js';
-import { LocksModule } from './modules/locks/locks.module.js';
-import { ExceptionsModule } from './modules/exceptions/exceptions.module.js';
+import { OperationsModule } from './modules/operations/operations.module.js';
 import { AuthModule } from './middleware/auth.module.js';
 
 @Module({
@@ -15,9 +13,7 @@ import { AuthModule } from './middleware/auth.module.js';
     AuthModule,
     HealthModule,
     LoansModule,
-    PricingModule,
-    LocksModule,
-    ExceptionsModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}
